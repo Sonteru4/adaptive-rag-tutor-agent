@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-split">
+    <!-- Left Side (Quiz Configuration) -->
+    <div class="left-container">
+        <h2>📝 Configure Your Quiz</h2>
+        <form id="quiz-form" enctype="multipart/form-data">
+            <label for="num-questions">Number of Questions:</label>
+            <input type="number" id="num-questions" name="num-questions" min="1" max="50" value="5" required>
+
+            <label for="difficulty-level">Difficulty Level:</label>
+            <select id="difficulty-level" name="difficulty-level" required>
+                <option value="" disabled selected>Select Difficulty</option>
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+
+            <label for="quiz-topic">Topic Focus:</label>
+            <input type="text" id="quiz-topic" name="quiz-topic" placeholder="Enter topic focus">
+
+            <label for="pdf-upload">Upload Knowledge Base (optional):</label>
+            <input type="file" id="pdf-upload" name="pdf-upload" accept="application/pdf" multiple>
+
+            <button type="button" class="submit-btn" onclick="generateQuiz()">Generate Quiz</button>
+            <p id="quiz-message" style="display: none; color: green;"></p>
+        </form>
+    </div>
+
+    <!-- Right Side (Quiz Display) -->
+    <div class="right-container">
+        <h2>📝 Your Quiz</h2>
+        <div id="quiz-container" class="quiz-container">
+            <!-- Quiz will be dynamically inserted here -->
+        </div>
+        <div id="quiz-result" class="quiz-result" style="display: none;">
+            <h3>Your Score: <span id="score"></span>/<span id="total-questions"></span></h3>
+        </div>
+    </div>
+</div>
+
+<!-- Include JavaScript -->
+<script>
+    let quizData = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+
+    function generateQuiz() {
+        const form = document.getElementById("quiz-form");
+        const formData = new FormData(form);
+
+        // Disable the generate quiz button
+        const generateButton = document.querySelector(".submit-btn");
+        generateButton.disabled = true;
+        generateButton.innerText = "Generating Quiz...";
+
+        fetch("{{ url_for('quiz.generate_quiz_route') }}", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Error: " + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                quizData = data.quiz;
+                displayQuiz();
+            }
+            // Re-enable the generate quiz button
+            generateButton.disabled = false;
+            generateButton.innerText = "Generate Quiz";
+        })
+        .catch(error => {
+            console.error("Error generating quiz:", error);
+            alert("An error occurred while generating the quiz.");
+            // Re-enable the generate quiz button
+            generateButton.disabled = false;
+            generateButton.innerText = "Generate Quiz";
+        });
+    }
+
+    function displayQuiz() {
+        const quizContainer = document.getElementById("quiz-container");
+        quizContainer.innerHTML = "";
+
+        quizData.forEach((item, index) => {
+            const questionDiv = document.createElement("div");
+            questionDiv.className = "quiz-question";
+
+            const questionText = document.createElement("p");
+            questionText.innerText = `${index + 1}. ${item.question}`;
+            questionDiv.appendChild(questionText);
+
+            const optionsList = document.createElement("ul");
+            optionsList.className = "options-list";
+
+            item.options.forEach((option, idx) => {
+                const optionItem = document.createElement("li");
+                optionItem.innerText = option;
+                optionItem.dataset.correct = option === item.correct_answer;
+                optionItem.onclick = function() {
+                    selectOption(this, index);
+                };
+                optionsList.appendChild(optionItem);
+            });
+
+            questionDiv.appendChild(optionsList);
+            quizContainer.appendChild(questionDiv);
+        });
+    }
+
+    function selectOption(selectedOption, questionIndex) {
+        const options = selectedOption.parentElement.children;
+        for (let opt of options) {
+            opt.onclick = null; // Disable clicking after selection
+            if (opt.dataset.correct === "true") {
+                opt.classList.add("correct");
+            } else {
+                opt.classList.add("incorrect");
+            }
+        }
+
+        if (selectedOption.dataset.correct === "true") {
+            score++;
+        }
+
+        // If all questions are answered, display the result
+        if (document.querySelectorAll(".options-list li[onclick]").length === 0) {
+            displayResult();
+        }
+    }
+
+    function displayResult() {
+        const quizResult = document.getElementById("quiz-result");
+        const scoreElement = document.getElementById("score");
+        const totalQuestionsElement = document.getElementById("total-questions");
+
+        scoreElement.innerText = score;
+        totalQuestionsElement.innerText = quizData.length;
+
+        quizResult.style.display = "block";
+    }
+</script>
+{% endblock %}

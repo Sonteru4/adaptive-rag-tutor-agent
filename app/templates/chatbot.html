@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Victorian Study App - Chatbot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Link to CSS stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <!-- JavaScript functions -->
+    <script>
+        function logout() {
+            window.location.href = "{{ url_for('auth.logout') }}";
+        }
+
+        function sendMessage() {
+            const messageInput = document.getElementById("chat-input");
+            const message = messageInput.value.trim();
+
+            if (message !== "") {
+                const chatBox = document.getElementById("chat-box");
+
+                const userMessage = document.createElement("p");
+                userMessage.className = "user-message";
+                userMessage.innerText = message;
+                chatBox.appendChild(userMessage);
+
+                // Scroll to the bottom of the chat box
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                // Disable input and button while waiting for response
+                messageInput.disabled = true;
+                const sendButton = document.getElementById("send-button");
+                sendButton.disabled = true;
+
+                fetch("{{ url_for('chatbot.chat_ui') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ message: message })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Error: " + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const botMessage = document.createElement("p");
+                    botMessage.className = "bot-message";
+                    botMessage.innerText = data.response_text || "I'm here to help you!";
+                    chatBox.appendChild(botMessage);
+
+                    // Scroll to the bottom of the chat box
+                    chatBox.scrollTop = chatBox.scrollHeight;
+
+                    // Re-enable input and button
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    messageInput.focus();
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    const errorMessage = document.createElement("p");
+                    errorMessage.className = "bot-message";
+                    errorMessage.innerText = "An error occurred while processing your request.";
+                    chatBox.appendChild(errorMessage);
+
+                    // Scroll to the bottom of the chat box
+                    chatBox.scrollTop = chatBox.scrollHeight;
+
+                    // Re-enable input and button
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    messageInput.focus();
+                });
+
+                messageInput.value = "";
+            }
+        }
+
+        function uploadKnowledgeBase() {
+            const form = document.getElementById("knowledge-form");
+            const formData = new FormData(form);
+
+            fetch("{{ url_for('chatbot.upload_knowledge') }}", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Error: " + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const messageElement = document.getElementById("upload-message");
+                if (data.message) {
+                    messageElement.style.display = "block";
+                    messageElement.innerText = data.message;
+                    setTimeout(() => { messageElement.style.display = "none"; }, 3000);
+                } else if (data.error) {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error uploading knowledge base:", error);
+                alert("An error occurred while uploading the knowledge base.");
+            });
+        }
+
+        function generateQuiz() {
+            const numQuestions = document.getElementById("num-questions").value;
+            const difficultyLevel = document.getElementById("difficulty-level").value;
+
+            if (!numQuestions || !difficultyLevel) {
+                alert("Please fill in all quiz settings.");
+                return;
+            }
+
+            const generateButton = document.getElementById("generate-quiz-button");
+            generateButton.disabled = true;
+            generateButton.innerText = "Generating Quiz...";
+
+            fetch("{{ url_for('chatbot.generate_quiz_from_conversation_route') }}", {  // Updated endpoint name
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    num_questions: numQuestions,
+                    difficulty_level: difficultyLevel
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Error: " + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    displayQuiz(data.quiz);
+                }
+                generateButton.disabled = false;
+                generateButton.innerText = "Generate Quiz";
+            })
+            .catch(error => {
+                console.error("Error generating quiz:", error);
+                alert("An error occurred while generating the quiz.");
+                generateButton.disabled = false;
+                generateButton.innerText = "Generate Quiz";
+            });
+        }
+
+        function displayQuiz(quizData) {
+            const quizContainer = document.getElementById("quiz-container");
+            quizContainer.innerHTML = "";
+
+            let score = 0;
+
+            quizData.forEach((item, index) => {
+                const questionDiv = document.createElement("div");
+                questionDiv.className = "quiz-question";
+
+                const questionText = document.createElement("p");
+                questionText.innerText = `${index + 1}. ${item.question}`;
+                questionDiv.appendChild(questionText);
+
+                const optionsList = document.createElement("ul");
+                optionsList.className = "options-list";
+
+                item.options.forEach((option) => {
+                    const optionItem = document.createElement("li");
+                    optionItem.innerText = option;
+                    optionItem.dataset.correct = option === item.correct_answer;
+                    optionItem.onclick = function() {
+                        selectOption(this);
+                    };
+                    optionsList.appendChild(optionItem);
+                });
+
+                questionDiv.appendChild(optionsList);
+                quizContainer.appendChild(questionDiv);
+            });
+        }
+
+        function selectOption(selectedOption) {
+            const options = selectedOption.parentElement.children;
+            for (let opt of options) {
+                opt.onclick = null; // Disable clicking after selection
+                if (opt.dataset.correct === "true") {
+                    opt.classList.add("correct");
+                } else {
+                    opt.classList.add("incorrect");
+                }
+            }
+
+            // Update score
+            if (!selectedOption.parentElement.dataset.answered) {
+                if (selectedOption.dataset.correct === "true") {
+                    selectedOption.parentElement.dataset.score = 1;
+                } else {
+                    selectedOption.parentElement.dataset.score = 0;
+                }
+                selectedOption.parentElement.dataset.answered = true;
+            }
+
+            // Check if all questions are answered
+            const allAnswered = document.querySelectorAll('.options-list').length === document.querySelectorAll('.options-list[data-answered="true"]').length;
+
+            if (allAnswered) {
+                displayResult();
+            }
+        }
+
+        function displayResult() {
+            const optionsLists = document.querySelectorAll('.options-list');
+            let totalScore = 0;
+            optionsLists.forEach(list => {
+                totalScore += parseInt(list.dataset.score || 0);
+            });
+
+            const quizResult = document.getElementById("quiz-result");
+            const scoreElement = document.getElementById("score");
+            const totalQuestionsElement = document.getElementById("total-questions");
+
+            scoreElement.innerText = totalScore;
+            totalQuestionsElement.innerText = optionsLists.length;
+
+            quizResult.style.display = "block";
+        }
+    </script>
+</head>
+<body>
+    <!-- Navbar -->
+    <div class="navbar">
+        <a href="{{ url_for('index') }}">🏠 Home</a>
+        <a href="{{ url_for('chatbot.chat_ui_page') }}">Chatbot</a>
+        <a href="{{ url_for('quiz.quiz_ui') }}">Quiz</a>
+        <a href="#" onclick="logout()">Logout</a>
+    </div>
+
+    <!-- Container Split into Three Parts -->
+    <div class="container-three">
+        <!-- Left Container (Knowledgebase Setup) -->
+        <div class="left-container">
+            <h2>📝 Knowledgebase Setup</h2>
+            <form id="knowledge-form" onsubmit="event.preventDefault(); uploadKnowledgeBase();" enctype="multipart/form-data">
+                <label for="language-selection">Choose Language:</label>
+                <select id="language-selection" name="language-selection" required>
+                    <option value="" disabled selected>Select Language</option>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                </select>
+                
+                <label for="word-limit">Word Limit:</label>
+                <input type="number" id="word-limit" name="word-limit" min="100" max="10000" placeholder="Enter word limit" required>
+                
+                <label for="focus-areas">Areas to Focus On:</label>
+                <textarea id="focus-areas" name="focus-areas" rows="4" placeholder="Enter focus areas"></textarea>
+
+                <!-- PDF Upload Input -->
+                <label for="pdf-upload">Upload PDF(s):</label>
+                <input type="file" id="pdf-upload" name="pdf-upload" accept="application/pdf" multiple>
+
+                <button type="submit" class="submit-btn">Upload Knowledgebase</button>
+                <p id="upload-message" style="display: none; color: green;"></p>
+            </form>
+        </div>
+
+        <!-- Middle Container (Chat Interface) -->
+        <div class="middle-container">
+            <h2>💬 Chat with Sir Learnsworth</h2>
+            <div id="chat-box" class="chat-box"></div>
+            <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key === 'Enter') sendMessage()">
+            <button id="send-button" onclick="sendMessage()">Send</button>
+        </div>
+
+        <!-- Right Container (Quiz Generation) -->
+        <div class="right-container">
+            <h2>📝 Generate Quiz from Conversation</h2>
+            <div class="quiz-settings">
+                <label for="num-questions">Number of Questions:</label>
+                <input type="number" id="num-questions" name="num-questions" min="1" max="50" value="5" required>
+
+                <label for="difficulty-level">Difficulty Level:</label>
+                <select id="difficulty-level" name="difficulty-level" required>
+                    <option value="" disabled selected>Select Difficulty</option>
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+
+                <button id="generate-quiz-button" class="submit-btn" onclick="generateQuiz()">Generate Quiz</button>
+            </div>
+            <div id="quiz-container" class="quiz-container">
+                <!-- Quiz will be dynamically inserted here -->
+            </div>
+            <div id="quiz-result" class="quiz-result" style="display: none;">
+                <h3>Your Score: <span id="score"></span>/<span id="total-questions"></span></h3>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Victorian Study App - Login/Signup</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        function toggleForm() {
+            const loginForm = document.getElementById("login-form");
+            const signupForm = document.getElementById("signup-form");
+            loginForm.style.display = loginForm.style.display === "none" ? "block" : "none";
+            signupForm.style.display = signupForm.style.display === "none" ? "block" : "none";
+        }
+
+        function handleForgotPassword() {
+            alert("Forgot password functionality is coming soon!");
+        }
+    </script>
+</head>
+<body>
+    <div class="background-overlay">
+        <div class="auth-container">
+            <h1>Victorian Study App</h1>
+            <p>Welcome! Log in or sign up to begin your journey with Sir Learnsworth.</p>
+
+            <!-- Login Form -->
+            <form id="login-form" action="{{ url_for('auth.login') }}" method="post">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" name="username" placeholder="Enter username" required>
+
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" name="password" placeholder="Enter password" required>
+
+                <button type="submit" class="action-button">Login</button>
+                <p><a href="#" onclick="handleForgotPassword()" class="forgot-link">Forgot Password?</a></p>
+                <p>Don't have an account? <a href="#" onclick="toggleForm()" class="signup-link">Sign up here</a></p>
+            </form>
+
+            <!-- Signup Form (Initially Hidden) -->
+            <form id="signup-form" action="{{ url_for('auth.signup') }}" method="post" style="display: none;">
+                <label for="signup-username">Username</label>
+                <input type="text" id="signup-username" name="username" placeholder="Choose a username" required>
+
+                <label for="signup-password">Password</label>
+                <input type="password" id="signup-password" name="password" placeholder="Create a password" required>
+
+                <button type="submit" class="action-button">Sign Up</button>
+                <p>Already have an account? <a href="#" onclick="toggleForm()" class="signup-link">Log in here</a></p>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
