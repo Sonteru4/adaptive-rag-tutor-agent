@@ -6,3 +6,4 @@ test.csv
 *.pyc  # To ignore compiled Python files
 __pycache__/  # To ignore Python cache folders
 
+.DS_Store
